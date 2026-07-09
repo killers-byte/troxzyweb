@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin BIN System - Live Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; }
+        .table-row:hover { background-color: #161b22; }
+        .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 12px; }
+        .stat-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 0.75rem; padding: 1rem; }
+        .pagination button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 0.25rem 0.75rem; border-radius: 0.25rem; margin: 0 0.25rem; }
+        .pagination button.active { background: #1f6feb; border-color: #388bfd; }
+        .online-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 4px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-wrap justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold"><i class="fas fa-chart-line"></i> Panel Administrasi <span class="text-green-400 text-sm">(Live)</span></h1>
+                <p class="text-gray-400 text-sm">Data diperbarui setiap 5 detik</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-sm text-gray-500" id="last-update"></div>
+                <button onclick="location.reload()" class="bg-[#1f6feb] hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Ringkasan Statistik -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="stats-container"></div>
+
+        <!-- Pengguna Online -->
+        <div class="mb-6">
+            <h2 class="text-xl font-bold mb-3"><i class="fas fa-users text-green-400"></i> Pengguna Aktif <span id="online-count" class="text-sm text-gray-400"></span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="online-users"></div>
+        </div>
+
+        <!-- Pencarian -->
+        <div class="mb-4">
+            <input id="search-input" type="text" placeholder="Cari username, IP, lokasi, atau isi chat..." 
+                   class="w-full bg-[#161b22] border border-[#30363d] rounded-lg p-3 outline-none focus:border-blue-500 placeholder-gray-500">
+        </div>
+
+        <!-- Tabel Log -->
+        <div class="overflow-x-auto border border-[#30363d] rounded-lg">
+            <table class="w-full text-sm" id="log-table">
+                <thead class="bg-[#161b22] text-gray-400 uppercase text-xs">
+                    <tr>
+                        <th class="p-3 text-left">Waktu</th>
+                        <th class="p-3 text-left">User</th>
+                        <th class="p-3 text-left">IP</th>
+                        <th class="p-3 text-left">Lokasi</th>
+                        <th class="p-3 text-left">Device</th>
+                        <th class="p-3 text-left">Aktivitas</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-between items-center mt-4 text-sm">
+            <div class="text-gray-500" id="page-info"></div>
+            <div class="pagination flex" id="pagination-controls"></div>
+        </div>
+    </div>
+
+    <script>
+        let allLogs = [];
+        let filteredLogs = [];
+        let currentPage = 1;
+        const rowsPerPage = 25;
+
+        // Fetch data live
+        async function fetchLiveData() {
+            try {
+                const res = await fetch('/api/admin/live-data');
+                if (!res.ok) return;
+                const data = await res.json();
+                allLogs = data.logs || [];
+                filteredLogs = allLogs;
+                renderStats(allLogs);
+                renderOnlineUsers(data.active_users || []);
+                // Re-apply search filter
+                const query = document.getElementById('search-input').value;
+                filterLogs(query);
+                document.getElementById('last-update').innerHTML = '<i class="fas fa-clock"></i> ' + new Date().toLocaleTimeString('id-ID');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Statistik
+        function computeStats(logs) {
+            const uniqueUsers = new Set(logs.map(l => l.username)).size;
+            const uniqueIPs = new Set(logs.map(l => l.ip)).size;
+            const totalChats = logs.filter(l => l.source === 'chat').length;
+            const totalAccess = logs.filter(l => l.source === 'halaman').length;
+            return { uniqueUsers, uniqueIPs, totalChats, totalAccess, total: logs.length };
+        }
+
+        function renderStats(logs) {
+            const stats = computeStats(logs);
+            document.getElementById('stats-container').innerHTML = `
+                <div class="stat-card">
+                    <div class="text-gray-400 text-xs"><i class="fas fa-list"></i> Total Aktivitas</div>
+                    <div class="text-2xl font-bold">${stats.total}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-gray-400 text-xs"><i class="fas fa-user"></i> Pengguna Unik</div>
+                    <div class="text-2xl font-bold text-blue-400">${stats.uniqueUsers}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-gray-400 text-xs"><i class="fas fa-globe"></i> IP Unik</div>
+                    <div class="text-2xl font-bold text-purple-400">${stats.uniqueIPs}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-gray-400 text-xs"><i class="fas fa-comments"></i> Chat / Halaman</div>
+                    <div class="text-2xl font-bold text-green-400">${stats.totalChats} / ${stats.totalAccess}</div>
+                </div>
+            `;
+        }
+
+        // Render pengguna online
+        function renderOnlineUsers(users) {
+            const container = document.getElementById('online-users');
+            document.getElementById('online-count').textContent = `(${users.length} online)`;
+            if (users.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm col-span-full"><i class="fas fa-user-slash"></i> Tidak ada pengguna online</div>';
+                return;
+            }
+            container.innerHTML = users.map(u => `
+                <div class="stat-card flex items-center gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="online-dot"></span>
+                            <span class="font-bold"><i class="fas fa-user"></i> ${u.username}</span>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-1"><i class="fas fa-network-wired"></i> ${u.ip} · ${u.device}</div>
+                        <div class="text-xs text-gray-500"><i class="fas fa-map-marker-alt"></i> ${u.location || 'Lokasi tidak diketahui'}</div>
+                        <div class="text-xs text-gray-600"><i class="fas fa-clock"></i> Terakhir: ${new Date(u.last_seen).toLocaleTimeString('id-ID')}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render tabel
+        function renderTable(logs, page = 1) {
+            const start = (page - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageLogs = logs.slice(start, end);
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            pageLogs.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = 'table-row cursor-pointer';
+                tr.onclick = () => toggleDetail(tr);
+
+                const locationText = log.location || 'Tidak diketahui';
+                const coordinates = log.geo_raw ? `${log.geo_raw.lat},${log.geo_raw.lon}` : null;
+                const locationHTML = coordinates 
+                    ? `<span class="tooltip">${locationText}<span class="tooltip-text">${coordinates}</span></span> <a href="https://www.google.com/maps?q=${coordinates}" target="_blank" class="text-blue-400 text-xs ml-1"><i class="fas fa-map-marked-alt"></i></a>`
+                    : locationText;
+
+                tr.innerHTML = `
+                    <td class="p-3 text-gray-300 whitespace-nowrap"><i class="fas fa-calendar-alt"></i> ${log.timestamp}</td>
+                    <td class="p-3 font-medium"><i class="fas fa-user"></i> ${log.username}</td>
+                    <td class="p-3 font-mono text-blue-400"><i class="fas fa-globe"></i> ${log.ip}</td>
+                    <td class="p-3 text-xs">${locationHTML}</td>
+                    <td class="p-3 text-xs"><i class="fas fa-laptop"></i> ${log.device}</td>
+                    <td class="p-3">
+                        ${log.source === 'halaman' 
+                            ? '<span class="badge bg-green-700 text-green-200"><i class="fas fa-file-alt"></i> Buka Halaman</span>'
+                            : `<span class="badge bg-purple-700 text-purple-200"><i class="fas fa-comment-dots"></i> Chat (${log.tool || 'core'})</span>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                // Detail row
+                const detailTr = document.createElement('tr');
+                detailTr.className = 'hidden detail-row bg-[#0d1117]';
+                let detailContent = '';
+                if (log.prompt) {
+                    detailContent += `<div class="mb-2"><strong class="text-red-400"><i class="fas fa-question-circle"></i> Prompt:</strong><pre class="whitespace-pre-wrap text-xs mt-1 bg-[#161b22] p-2 rounded">${escapeHtml(log.prompt)}</pre></div>`;
+                }
+                if (log.response) {
+                    detailContent += `<div><strong class="text-green-400"><i class="fas fa-reply"></i> Response:</strong><pre class="whitespace-pre-wrap text-xs mt-1 bg-[#161b22] p-2 rounded">${escapeHtml(log.response)}</pre></div>`;
+                }
+                if (!log.prompt && !log.response) {
+                    detailContent = '<span class="text-gray-500"><i class="fas fa-info-circle"></i> Tidak ada detail tambahan.</span>';
+                }
+                detailTr.innerHTML = `<td colspan="6" class="p-4">${detailContent}</td>`;
+                tbody.appendChild(detailTr);
+            });
+
+            document.getElementById('page-info').innerHTML = `<i class="fas fa-eye"></i> Menampilkan ${start+1}-${Math.min(end, logs.length)} dari ${logs.length} entri`;
+        }
+
+        function toggleDetail(row) {
+            const detailRow = row.nextElementSibling;
+            if (detailRow && detailRow.classList.contains('detail-row')) {
+                detailRow.classList.toggle('hidden');
+            }
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Pagination
+        function renderPagination(totalItems, currentPage) {
+            const totalPages = Math.ceil(totalItems / rowsPerPage);
+            const container = document.getElementById('pagination-controls');
+            container.innerHTML = '';
+            if (totalPages <= 1) return;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = i === currentPage ? 'active' : '';
+                btn.addEventListener('click', () => {
+                    currentPage = i;
+                    renderTable(filteredLogs, i);
+                    renderPagination(filteredLogs.length, i);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+                container.appendChild(btn);
+            }
+        }
+
+        // Pencarian
+        function filterLogs(query) {
+            const q = query.toLowerCase();
+            if (!q) {
+                filteredLogs = allLogs;
+            } else {
+                filteredLogs = allLogs.filter(log => {
+                    return (log.username && log.username.toLowerCase().includes(q)) ||
+                           (log.ip && log.ip.includes(q)) ||
+                           (log.location && log.location.toLowerCase().includes(q)) ||
+                           (log.prompt && log.prompt.toLowerCase().includes(q)) ||
+                           (log.response && log.response.toLowerCase().includes(q));
+                });
+            }
+            currentPage = 1;
+            renderTable(filteredLogs, 1);
+            renderPagination(filteredLogs.length, 1);
+            renderStats(filteredLogs);
+        }
+
+        // Event listener
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            filterLogs(e.target.value);
+        });
+
+        // Initial load & polling
+        fetchLiveData();
+        setInterval(fetchLiveData, 5000);
+    </script>
+</body>
+</html>
